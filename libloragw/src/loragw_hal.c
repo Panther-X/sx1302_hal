@@ -23,8 +23,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
     #define _XOPEN_SOURCE 500
 #endif
 
-#define _GNU_SOURCE     /* needed for qsort_r to be defined */
-#include <stdlib.h>     /* qsort_r */
+#include <stdlib.h>     /* qsort */
 
 #include <stdint.h>     /* C99 types */
 #include <stdbool.h>    /* bool type */
@@ -297,19 +296,14 @@ static int remove_pkt(struct lgw_pkt_rx_s * p, uint8_t * nb_pkt, uint8_t pkt_ind
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
-int compare_pkt_tmst(const void *a, const void *b, void *arg)
+int compare_pkt_tmst(const void *a, const void *b)
 {
     struct lgw_pkt_rx_s *p = (struct lgw_pkt_rx_s *)a;
     struct lgw_pkt_rx_s *q = (struct lgw_pkt_rx_s *)b;
-    int *counter = (int *)arg;
     int p_count, q_count;
 
     p_count = p->count_us;
     q_count = q->count_us;
-
-    if (p_count > q_count) {
-        *counter = *counter + 1;
-    }
 
     return (p_count - q_count);
 }
@@ -323,7 +317,6 @@ static int merge_packets(struct lgw_pkt_rx_s * p, uint8_t * nb_pkt) {
     int pkt_idx;
 #endif
     bool dup_restart = false;
-    int counter_qsort_swap = 0;
 
     /* Check input parameters */
     CHECK_NULL(p);
@@ -417,8 +410,8 @@ static int merge_packets(struct lgw_pkt_rx_s * p, uint8_t * nb_pkt) {
     }
 
     /* Sort the packet array by ascending counter_us value */
-    qsort_r(p, cpt, sizeof(p[0]), compare_pkt_tmst, &counter_qsort_swap);
-    DEBUG_PRINTF("%d elements swapped during sorting...\n", counter_qsort_swap);
+    qsort(p, cpt, sizeof(p[0]), compare_pkt_tmst);
+    DEBUG_PRINTF("elements swapped during sorting...\n");
 
     /* --------------------------------------------- */
     /* ---------- For Debug only - START ----------- */
@@ -1113,8 +1106,22 @@ int lgw_start(void) {
             }
         }
         if (i == sizeof I2C_PORT_TEMP_SENSOR) {
-            printf("ERROR: no temperature sensor found.\n");
-            return LGW_HAL_ERROR;
+            printf("ERROR: no stts751 temperature sensor found.\n");
+        }
+
+        {
+            uint8_t serialnumber[8];
+
+            ts_fd = sht2x_init();
+            if (ts_fd < 0) {
+                printf("SHT2x initialize failure\n");
+            }
+            if (sht2x_softreset(ts_fd) < 0) {
+                printf("SHT2x softreset failure\n");
+            }
+            if (sht2x_get_serialnumber(ts_fd, serialnumber, 8) < 0) {
+                printf("SHT2x get serial number failure\n");
+            }
         }
 
         /* Configure ADC AD338R for full duplex (CN490 reference design) */
@@ -1598,6 +1605,9 @@ int lgw_get_temperature(float* temperature) {
     switch (CONTEXT_COM_TYPE) {
         case LGW_COM_SPI:
             err = stts751_get_temperature(ts_fd, ts_addr, temperature);
+            if (err) {
+                err = sht2x_get_temperature(ts_fd,temperature);
+            }
             break;
         case LGW_COM_USB:
             err = lgw_com_get_temperature(temperature);

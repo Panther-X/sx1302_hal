@@ -124,6 +124,7 @@ libloragw.a: $(OBJDIR)/loragw_spi.o \
 			 $(OBJDIR)/loragw_hal.o \
 			 $(OBJDIR)/loragw_lbt.o \
 			 $(OBJDIR)/loragw_stts751.o \
+			 $(OBJDIR)/loragw_sht20.o \
 			 $(OBJDIR)/loragw_gps.o \
 			 $(OBJDIR)/loragw_sx1302_timestamp.o \
 			 $(OBJDIR)/loragw_sx1302_rx.o \
