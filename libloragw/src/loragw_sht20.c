@@ -60,7 +60,7 @@ int sht2x_init(void)
 {
     int fd;
 
-    if ((fd = open("/dev/i2c-1", O_RDWR)) < 0) {
+    if ((fd = open("/dev/i2c-2", O_RDWR)) < 0) {
         printf("i2c device open failed: %s\n", strerror(errno));
         return -1;
     }
