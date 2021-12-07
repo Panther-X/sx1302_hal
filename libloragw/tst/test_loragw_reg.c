@@ -38,7 +38,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 /* --- PRIVATE MACROS ------------------------------------------------------- */
 
 #define COM_TYPE_DEFAULT LGW_COM_SPI
-#define COM_PATH_DEFAULT "/dev/spidev0.0"
+#define COM_PATH_DEFAULT "/dev/spidev3.0"
 
 /* -------------------------------------------------------------------------- */
 /* --- PRIVATE CONSTANTS ---------------------------------------------------- */
@@ -124,6 +124,7 @@ int main(int argc, char ** argv)
             if (val != loregs[i].dflt) {
                 printf("ERROR: default value for register at index %d is %d, should be %d\n", i, val, loregs[i].dflt);
                 error_found = true;
+                break;
             }
         }
     }
@@ -173,6 +174,7 @@ int main(int argc, char ** argv)
             if (val != rand_values[i]) {
                 printf("ERROR: value read from register at index %d differs from the written value (w:%u r:%d)\n", i, rand_values[i], val);
                 error_found = true;
+                break;
             } else {
                 //printf("INFO: MATCH reg %d (%u, %u)\n", i, rand_values[i], (uint8_t)val);
             }
@@ -196,7 +198,10 @@ int main(int argc, char ** argv)
         }
     }
 
-    return 0;
+    if (error_found == true)
+	    return -1;
+    else
+	    return 0;
 }
 
 /* -------------------------------------------------------------------------- */
