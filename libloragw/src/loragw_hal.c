@@ -204,6 +204,7 @@ FILE * log_file = NULL;
 /* I2C temperature sensor handles */
 static int     ts_fd = -1;
 static uint8_t ts_addr = 0xFF;
+static float last_temperature = 30;
 
 /* I2C AD5338 handles */
 static int     ad_fd = -1;
@@ -1122,6 +1123,11 @@ int lgw_start(void) {
             if (sht2x_get_serialnumber(ts_fd, serialnumber, 8) < 0) {
                 printf("SHT2x get serial number failure\n");
             }
+            
+            if (ts_fd > 0 ) {
+            			lgw_get_temperature(&last_temperature);
+            			printf("INFO: Last temperature updated on initialisation: %.0f C\n", last_temperature);
+          		}
         }
 
         /* Configure ADC AD338R for full duplex (CN490 reference design) */
@@ -1260,7 +1266,7 @@ int lgw_receive(uint8_t max_pkt, struct lgw_pkt_rx_s *pkt_data) {
     uint8_t nb_pkt_fetched = 0;
     uint8_t nb_pkt_found = 0;
     uint8_t nb_pkt_left = 0;
-    float current_temperature = 0.0, rssi_temperature_offset = 0.0;
+    float rssi_temperature_offset = 0.0;
     /* performances variables */
     struct timeval tm;
 
@@ -1293,13 +1299,6 @@ int lgw_receive(uint8_t max_pkt, struct lgw_pkt_rx_s *pkt_data) {
         printf("WARNING: not enough space allocated, fetched %d packet(s), %d will be left in RX buffer\n", nb_pkt_fetched, nb_pkt_left);
     }
 
-    /* Apply RSSI temperature compensation */
-    res = lgw_get_temperature(&current_temperature);
-    if (res != LGW_I2C_SUCCESS) {
-        printf("ERROR: failed to get current temperature\n");
-        return LGW_HAL_ERROR;
-    }
-
     /* Iterate on the RX buffer to get parsed packets */
     for (nb_pkt_found = 0; nb_pkt_found < ((nb_pkt_fetched <= max_pkt) ? nb_pkt_fetched : max_pkt); nb_pkt_found++) {
         /* Get packet and move to next one */
@@ -1312,14 +1311,14 @@ int lgw_receive(uint8_t max_pkt, struct lgw_pkt_rx_s *pkt_data) {
             return LGW_HAL_ERROR;
         }
 
-        /* Appli RSSI offset calibrated for the board */
+        /* Appli RSSI offset calibrated for the board with last_temperature known */
         pkt_data[nb_pkt_found].rssic += CONTEXT_RF_CHAIN[pkt_data[nb_pkt_found].rf_chain].rssi_offset;
         pkt_data[nb_pkt_found].rssis += CONTEXT_RF_CHAIN[pkt_data[nb_pkt_found].rf_chain].rssi_offset;
 
-        rssi_temperature_offset = sx1302_rssi_get_temperature_offset(&CONTEXT_RF_CHAIN[pkt_data[nb_pkt_found].rf_chain].rssi_tcomp, current_temperature);
+        rssi_temperature_offset = sx1302_rssi_get_temperature_offset(&CONTEXT_RF_CHAIN[pkt_data[nb_pkt_found].rf_chain].rssi_tcomp, last_temperature);
         pkt_data[nb_pkt_found].rssic += rssi_temperature_offset;
         pkt_data[nb_pkt_found].rssis += rssi_temperature_offset;
-        DEBUG_PRINTF("INFO: RSSI temperature offset applied: %.3f dB (current temperature %.1f C)\n", rssi_temperature_offset, current_temperature);
+        DEBUG_PRINTF("INFO: RSSI temperature offset applied: %.3f dB (current temperature %.1f C)\n", rssi_temperature_offset, last_temperature);
     }
 
     DEBUG_PRINTF("INFO: nb pkt found:%u left:%u\n", nb_pkt_found, nb_pkt_left);
@@ -1616,6 +1615,10 @@ int lgw_get_temperature(float* temperature) {
             printf("ERROR(%s:%d): wrong communication type (SHOULD NOT HAPPEN)\n", __FUNCTION__, __LINE__);
             break;
     }
+
+   	if (err == LGW_HAL_SUCCESS) {
+   	    last_temperature = *temperature;
+   	}
 
     DEBUG_PRINTF(" --- %s\n", "OUT");
 
